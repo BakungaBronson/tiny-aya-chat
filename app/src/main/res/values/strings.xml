@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Tiny Aya Chat</string>
+    <string name="hint_message">Type a message\u2026</string>
+    <string name="btn_send">Send</string>
+    <string name="btn_stop">Stop</string>
+    <string name="status_loading">Loading model\u2026</string>
+    <string name="status_ready">Ready</string>
+    <string name="status_generating">Generating\u2026</string>
+    <string name="status_error">Error</string>
+    <string name="model_filename">tiny-aya-global_q8_ekv2048.litertlm</string>
+    <string name="no_model_title">Model Not Found</string>
+    <string name="no_model_message">Copy tiny-aya-global_q8_ekv2048.litertlm to your device\'s Downloads folder, then restart the app.</string>
+</resources>
