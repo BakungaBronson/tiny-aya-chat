@@ -4,12 +4,7 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.ai.edge.litertlm.Backend
-import com.google.ai.edge.litertlm.Content
-import com.google.ai.edge.litertlm.Conversation
-import com.google.ai.edge.litertlm.Engine
-import com.google.ai.edge.litertlm.EngineConfig
-import com.google.ai.edge.litertlm.Message
+import com.craneai.tinyaya.llama.LlamaEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -49,12 +44,11 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     private val _tokenEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val tokenEvent: SharedFlow<Unit> = _tokenEvent
 
-    private var engine: Engine? = null
-    private var conversation: Conversation? = null
+    private var engine: LlamaEngine? = null
     private var generateJob: Job? = null
 
     // Model filename
-    private val modelFilename = "tiny-aya-global_q8_ekv2048.litertlm"
+    private val modelFilename = "tiny-aya-global-Q4_K_M.gguf"
 
     init {
         loadModel()
@@ -114,16 +108,9 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             )
 
             try {
-                withContext(Dispatchers.IO) {
-                    val config = EngineConfig(
-                        modelFile.absolutePath,
-                        Backend.CPU,
-                    )
-                    val eng = Engine(config)
-                    eng.initialize()
-                    engine = eng
-                    conversation = eng.createConversation()
-                }
+                val eng = LlamaEngine.getInstance(getApplication())
+                eng.loadModel(modelFile.absolutePath)
+                engine = eng
                 _state.value = ModelState.READY
                 _statusText.value = "Ready"
             } catch (e: Exception) {
@@ -133,17 +120,10 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Extract text from a Message's contents. */
-    private fun messageToText(msg: Message): String {
-        val parts = msg.contents.contents
-        return parts.filterIsInstance<Content.Text>()
-            .joinToString("") { it.text }
-    }
-
     fun sendMessage(userText: String) {
         if (userText.isBlank() || _state.value != ModelState.READY) return
 
-        val conv = conversation ?: return
+        val eng = engine ?: return
 
         // Add user message
         _messages.value = _messages.value + ChatMessage(userText, isUser = true)
@@ -156,21 +136,16 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         generateJob = viewModelScope.launch {
             try {
                 val responseBuilder = StringBuilder()
-                withContext(Dispatchers.IO) {
-                    conv.sendMessageAsync(userText).collect { message ->
-                        val chunk = messageToText(message)
-                        responseBuilder.append(chunk)
-                        withContext(Dispatchers.Main) {
-                            val msgs = _messages.value.toMutableList()
-                            msgs[msgs.lastIndex] = ChatMessage(
-                                responseBuilder.toString(),
-                                isUser = false,
-                                isStreaming = true,
-                            )
-                            _messages.value = msgs
-                            _tokenEvent.tryEmit(Unit)
-                        }
-                    }
+                eng.sendMessage(userText).collect { token ->
+                    responseBuilder.append(token)
+                    val msgs = _messages.value.toMutableList()
+                    msgs[msgs.lastIndex] = ChatMessage(
+                        responseBuilder.toString(),
+                        isUser = false,
+                        isStreaming = true,
+                    )
+                    _messages.value = msgs
+                    _tokenEvent.tryEmit(Unit)
                 }
                 // Mark streaming complete
                 val msgs = _messages.value.toMutableList()
@@ -198,6 +173,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun stopGenerating() {
+        engine?.stopGeneration()
         generateJob?.cancel()
         generateJob = null
         val msgs = _messages.value.toMutableList()
@@ -212,9 +188,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     override fun onCleared() {
         super.onCleared()
         generateJob?.cancel()
-        conversation?.close()
-        conversation = null
-        engine?.close()
+        engine?.destroy()
         engine = null
     }
 }

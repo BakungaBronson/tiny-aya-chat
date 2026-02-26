@@ -40,8 +40,8 @@ android {
 }
 
 dependencies {
-    // LiteRT-LM for on-device LLM inference
-    implementation("com.google.ai.edge.litertlm:litertlm-android:latest.release")
+    // llama.cpp engine (local module)
+    implementation(project(":llama"))
 
     // AndroidX
     implementation("androidx.core:core-ktx:1.12.0")

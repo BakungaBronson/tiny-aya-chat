@@ -15,3 +15,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "TinyAyaChat"
 include(":app")
+include(":llama")

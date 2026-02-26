@@ -1,2 +1,2 @@
-# Keep LiteRT-LM classes
--keep class com.google.ai.edge.litertlm.** { *; }
+# Keep llama.cpp JNI classes
+-keep class com.craneai.tinyaya.llama.** { *; }
