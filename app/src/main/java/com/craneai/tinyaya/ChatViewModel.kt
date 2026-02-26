@@ -1,7 +1,8 @@
 package com.craneai.tinyaya
 
 import android.app.Application
-import android.net.Uri
+import android.os.Environment
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.craneai.tinyaya.llama.LlamaEngine
@@ -31,6 +32,10 @@ enum class ModelState {
 
 class ChatViewModel(app: Application) : AndroidViewModel(app) {
 
+    companion object {
+        private const val TAG = "ChatViewModel"
+    }
+
     private val _state = MutableStateFlow(ModelState.LOADING)
     val state: StateFlow<ModelState> = _state
 
@@ -47,47 +52,31 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     private var engine: LlamaEngine? = null
     private var generateJob: Job? = null
 
-    // Model filename
-    private val modelFilename = "tiny-aya-global-Q4_K_M.gguf"
+    private val modelFilename: String
+        get() = getApplication<Application>().getString(R.string.model_filename)
 
     init {
         loadModel()
     }
 
     private fun findModelFile(): File? {
-        val file = File(getApplication<Application>().filesDir, modelFilename)
-        return if (file.exists() && file.length() > 0) file else null
-    }
-
-    fun loadModelFromUri(uri: Uri) {
-        viewModelScope.launch {
-            _state.value = ModelState.LOADING
-            _statusText.value = "Copying model file..."
-            try {
-                val destFile = File(getApplication<Application>().filesDir, modelFilename)
-                withContext(Dispatchers.IO) {
-                    getApplication<Application>().contentResolver.openInputStream(uri)?.use { input ->
-                        destFile.outputStream().use { output ->
-                            val buffer = ByteArray(8192)
-                            var bytesCopied: Long = 0
-                            var bytesRead: Int
-                            while (input.read(buffer).also { bytesRead = it } >= 0) {
-                                output.write(buffer, 0, bytesRead)
-                                bytesCopied += bytesRead
-                                val mb = bytesCopied / 1_000_000
-                                withContext(Dispatchers.Main) {
-                                    _statusText.value = "Copying model file... ${mb} MB"
-                                }
-                            }
-                        }
-                    } ?: throw Exception("Cannot open file")
-                }
-                loadModel()
-            } catch (e: Exception) {
-                _state.value = ModelState.ERROR
-                _statusText.value = "Error copying file: ${e.message}"
+        val app = getApplication<Application>()
+        val searchPaths = listOf(
+            app.getExternalFilesDir(null),
+            app.filesDir,
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+            Environment.getExternalStorageDirectory(),
+        )
+        for (dir in searchPaths) {
+            if (dir == null) continue
+            val candidate = File(dir, modelFilename)
+            Log.d(TAG, "Checking: ${candidate.absolutePath} -> exists=${candidate.exists()}")
+            if (candidate.exists() && candidate.length() > 0) {
+                Log.d(TAG, "Found model: ${candidate.absolutePath}")
+                return candidate
             }
         }
+        return null
     }
 
     private fun loadModel() {
@@ -99,7 +88,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
 
             if (modelFile == null) {
                 _state.value = ModelState.NOT_FOUND
-                _statusText.value = "Model not found. Tap \"Select Model File\" to browse."
+                _statusText.value = getApplication<Application>().getString(R.string.no_model_message)
                 return@launch
             }
 

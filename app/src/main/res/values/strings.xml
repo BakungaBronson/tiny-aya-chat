@@ -9,7 +9,6 @@
     <string name="status_generating">Generating\u2026</string>
     <string name="status_error">Error</string>
     <string name="model_filename">tiny-aya-global-q4_k_m.gguf</string>
-    <string name="btn_browse">Select Model File</string>
     <string name="no_model_title">Model Not Found</string>
-    <string name="no_model_message">Tap \"Select Model File\" to browse for the .gguf model file on your device.</string>
+    <string name="no_model_message">Place the .gguf file in Downloads or push via:\nadb push tiny-aya-global-q4_k_m.gguf /sdcard/Android/data/com.craneai.tinyaya/files/</string>
 </resources>
