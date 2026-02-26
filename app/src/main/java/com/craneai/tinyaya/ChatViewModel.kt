@@ -1,7 +1,7 @@
 package com.craneai.tinyaya
 
 import android.app.Application
-import android.os.Environment
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.ai.edge.litertlm.Backend
@@ -61,14 +61,39 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun findModelFile(): File? {
-        val candidates = listOf(
-            File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), modelFilename),
-            File(getApplication<Application>().filesDir, modelFilename),
-            File(getApplication<Application>().getExternalFilesDir(null), modelFilename),
-            File("/sdcard/Download/$modelFilename"),
-            File("/storage/emulated/0/Download/$modelFilename"),
-        )
-        return candidates.firstOrNull { it.exists() && it.length() > 0 }
+        val file = File(getApplication<Application>().filesDir, modelFilename)
+        return if (file.exists() && file.length() > 0) file else null
+    }
+
+    fun loadModelFromUri(uri: Uri) {
+        viewModelScope.launch {
+            _state.value = ModelState.LOADING
+            _statusText.value = "Copying model file..."
+            try {
+                val destFile = File(getApplication<Application>().filesDir, modelFilename)
+                withContext(Dispatchers.IO) {
+                    getApplication<Application>().contentResolver.openInputStream(uri)?.use { input ->
+                        destFile.outputStream().use { output ->
+                            val buffer = ByteArray(8192)
+                            var bytesCopied: Long = 0
+                            var bytesRead: Int
+                            while (input.read(buffer).also { bytesRead = it } >= 0) {
+                                output.write(buffer, 0, bytesRead)
+                                bytesCopied += bytesRead
+                                val mb = bytesCopied / 1_000_000
+                                withContext(Dispatchers.Main) {
+                                    _statusText.value = "Copying model file... ${mb} MB"
+                                }
+                            }
+                        }
+                    } ?: throw Exception("Cannot open file")
+                }
+                loadModel()
+            } catch (e: Exception) {
+                _state.value = ModelState.ERROR
+                _statusText.value = "Error copying file: ${e.message}"
+            }
+        }
     }
 
     private fun loadModel() {
@@ -80,7 +105,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
 
             if (modelFile == null) {
                 _state.value = ModelState.NOT_FOUND
-                _statusText.value = "Model not found. Copy $modelFilename to Downloads."
+                _statusText.value = "Model not found. Tap \"Select Model File\" to browse."
                 return@launch
             }
 

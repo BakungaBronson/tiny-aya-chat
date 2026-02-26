@@ -7,8 +7,8 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -20,6 +20,12 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private val viewModel: ChatViewModel by viewModels()
+
+    private val pickModelFile = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let { viewModel.loadModelFromUri(it) }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,6 +43,10 @@ class MainActivity : AppCompatActivity() {
             } else {
                 sendCurrentMessage()
             }
+        }
+
+        binding.btnBrowse.setOnClickListener {
+            pickModelFile.launch(arrayOf("*/*"))
         }
 
         binding.etMessage.setOnEditorActionListener { _, actionId, _ ->
@@ -70,25 +80,29 @@ class MainActivity : AppCompatActivity() {
             ModelState.NOT_FOUND -> {
                 binding.btnSend.isEnabled = false
                 binding.etMessage.isEnabled = false
-                showModelNotFoundDialog()
+                binding.btnBrowse.visibility = View.VISIBLE
             }
             ModelState.LOADING -> {
                 binding.btnSend.isEnabled = false
                 binding.etMessage.isEnabled = false
+                binding.btnBrowse.visibility = View.GONE
             }
             ModelState.READY -> {
                 binding.btnSend.isEnabled = true
                 binding.btnSend.text = getString(R.string.btn_send)
                 binding.etMessage.isEnabled = true
+                binding.btnBrowse.visibility = View.GONE
             }
             ModelState.GENERATING -> {
                 binding.btnSend.isEnabled = true
                 binding.btnSend.text = getString(R.string.btn_stop)
                 binding.etMessage.isEnabled = false
+                binding.btnBrowse.visibility = View.GONE
             }
             ModelState.ERROR -> {
                 binding.btnSend.isEnabled = false
                 binding.etMessage.isEnabled = false
+                binding.btnBrowse.visibility = View.GONE
             }
         }
     }
@@ -132,14 +146,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
         return tv
-    }
-
-    private fun showModelNotFoundDialog() {
-        AlertDialog.Builder(this)
-            .setTitle(R.string.no_model_title)
-            .setMessage(R.string.no_model_message)
-            .setPositiveButton("OK", null)
-            .show()
     }
 
     private fun scrollToBottom() {

@@ -9,6 +9,7 @@
     <string name="status_generating">Generating\u2026</string>
     <string name="status_error">Error</string>
     <string name="model_filename">tiny-aya-global_q8_ekv2048.litertlm</string>
+    <string name="btn_browse">Select Model File</string>
     <string name="no_model_title">Model Not Found</string>
-    <string name="no_model_message">Copy tiny-aya-global_q8_ekv2048.litertlm to your device\'s Downloads folder, then restart the app.</string>
+    <string name="no_model_message">Tap \"Select Model File\" to browse for tiny-aya-global_q8_ekv2048.litertlm on your device.</string>
 </resources>
