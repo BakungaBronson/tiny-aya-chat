@@ -1,7 +1,6 @@
 package com.craneai.tinyaya.llama
 
 import android.content.Context
-import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -29,7 +28,6 @@ class LlamaEngine private constructor() {
     private var cancelled = false
 
     companion object {
-        private const val TAG = "LlamaEngine"
         private var instance: LlamaEngine? = null
 
         fun getInstance(context: Context): LlamaEngine {
@@ -41,7 +39,6 @@ class LlamaEngine private constructor() {
                     // Initialize ggml backends from the native lib directory
                     val nativeLibDir = context.applicationInfo.nativeLibraryDir
                     engine.init(nativeLibDir)
-                    Log.i(TAG, engine.systemInfo())
                 }
             }
         }
