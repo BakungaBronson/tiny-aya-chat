@@ -2,6 +2,7 @@
 #include <jni.h>
 #include <iomanip>
 #include <cmath>
+#include <fstream>
 #include <string>
 #include <unistd.h>
 #include <sampling.h>
@@ -25,13 +26,53 @@ static std::string join(const std::vector<T> &values, const std::string &delim) 
  * LLama resources: context, model, batch and sampler
  */
 constexpr int   N_THREADS_MIN           = 2;
-constexpr int   N_THREADS_MAX           = 6;
-constexpr int   N_THREADS_HEADROOM      = 2;
+constexpr int   N_THREADS_MAX           = 8;
 
 constexpr int   DEFAULT_CONTEXT_SIZE    = 2048;
 constexpr int   OVERFLOW_HEADROOM       = 4;
 constexpr int   BATCH_SIZE              = 512;
 constexpr float DEFAULT_SAMPLER_TEMP    = 0.3f;
+
+/**
+ * Detect performance (big) cores on ARM big.LITTLE SoCs by reading max CPU frequencies.
+ * Returns the count of cores whose max frequency is above the median, clamped to [N_THREADS_MIN, N_THREADS_MAX].
+ * Falls back to (total_cores - 2) if sysfs is unreadable.
+ */
+static int detect_performance_core_count() {
+    const int n_cpus = (int) sysconf(_SC_NPROCESSORS_ONLN);
+    std::vector<long> freqs;
+
+    for (int i = 0; i < n_cpus; i++) {
+        char path[128];
+        snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu%d/cpufreq/cpuinfo_max_freq", i);
+        std::ifstream f(path);
+        long freq = 0;
+        if (f >> freq) {
+            freqs.push_back(freq);
+        }
+    }
+
+    if (freqs.size() < 2) {
+        // sysfs unavailable, fall back to conservative estimate
+        LOGi("detect_perf_cores: sysfs unreadable, falling back to %d - 2 = %d",
+             n_cpus, std::max(N_THREADS_MIN, n_cpus - 2));
+        return std::clamp(n_cpus - 2, N_THREADS_MIN, N_THREADS_MAX);
+    }
+
+    // Find median frequency to separate big from LITTLE cores
+    std::vector<long> sorted_freqs = freqs;
+    std::sort(sorted_freqs.begin(), sorted_freqs.end());
+    const long median_freq = sorted_freqs[sorted_freqs.size() / 2];
+
+    int big_cores = 0;
+    for (long freq : freqs) {
+        if (freq >= median_freq) big_cores++;
+    }
+
+    LOGi("detect_perf_cores: %d CPUs, %d performance cores (median freq: %ld kHz)",
+         n_cpus, big_cores, median_freq);
+    return std::clamp(big_cores, N_THREADS_MIN, N_THREADS_MAX);
+}
 
 static llama_model                      * g_model;
 static llama_context                    * g_context;
@@ -62,6 +103,8 @@ extern "C"
 JNIEXPORT jint JNICALL
 Java_com_craneai_tinyaya_llama_LlamaEngine_load(JNIEnv *env, jobject, jstring jmodel_path) {
     llama_model_params model_params = llama_model_default_params();
+    model_params.n_gpu_layers = 99;  // offload all layers to GPU if backend available
+    model_params.use_mlock = true;   // lock model in RAM to prevent page thrashing
 
     const auto *model_path = env->GetStringUTFChars(jmodel_path, 0);
     LOGd("%s: Loading model from: \n%s\n", __func__, model_path);
@@ -81,11 +124,9 @@ static llama_context *init_context(llama_model *model, const int n_ctx = DEFAULT
         return nullptr;
     }
 
-    // Multi-threading setup
-    const int n_threads = std::max(N_THREADS_MIN, std::min(N_THREADS_MAX,
-                                                     (int) sysconf(_SC_NPROCESSORS_ONLN) -
-                                                     N_THREADS_HEADROOM));
-    LOGi("%s: Using %d threads", __func__, n_threads);
+    // Use performance cores only — avoids slow LITTLE cores on big.LITTLE SoCs
+    const int n_threads = detect_performance_core_count();
+    LOGi("%s: Using %d threads (performance cores)", __func__, n_threads);
 
     // Context parameters setup
     llama_context_params ctx_params = llama_context_default_params();
