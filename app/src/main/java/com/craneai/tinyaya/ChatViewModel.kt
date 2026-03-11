@@ -125,8 +125,21 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         generateJob = viewModelScope.launch {
             try {
                 val responseBuilder = StringBuilder()
+                var tokenCount = 0
+                val startTime = System.nanoTime()
+
                 eng.sendMessage(userText).collect { token ->
                     responseBuilder.append(token)
+                    tokenCount++
+
+                    // Update tok/s every 5 tokens to avoid excessive UI updates
+                    if (tokenCount % 5 == 0) {
+                        val elapsed = (System.nanoTime() - startTime) / 1_000_000_000.0
+                        if (elapsed > 0) {
+                            _statusText.value = "Generating... %.1f tok/s".format(tokenCount / elapsed)
+                        }
+                    }
+
                     val msgs = _messages.value.toMutableList()
                     msgs[msgs.lastIndex] = ChatMessage(
                         responseBuilder.toString(),
@@ -136,7 +149,11 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                     _messages.value = msgs
                     _tokenEvent.tryEmit(Unit)
                 }
-                // Mark streaming complete
+
+                // Show final stats
+                val elapsed = (System.nanoTime() - startTime) / 1_000_000_000.0
+                val tokPerSec = if (elapsed > 0) tokenCount / elapsed else 0.0
+
                 val msgs = _messages.value.toMutableList()
                 msgs[msgs.lastIndex] = ChatMessage(
                     responseBuilder.toString(),
@@ -145,7 +162,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 )
                 _messages.value = msgs
                 _state.value = ModelState.READY
-                _statusText.value = "Ready"
+                _statusText.value = "Ready \u00b7 %d tokens \u00b7 %.1f tok/s".format(tokenCount, tokPerSec)
             } catch (e: Exception) {
                 val msgs = _messages.value.toMutableList()
                 if (msgs.isNotEmpty() && !msgs.last().isUser) {
