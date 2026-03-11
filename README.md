@@ -1,8 +1,8 @@
 # Tiny Aya Chat
 
-A lightweight Android chat app that runs [Cohere's Aya](https://cohere.com/research/aya) multilingual language model entirely on-device using [llama.cpp](https://github.com/ggml-org/llama.cpp). No internet connection required — all inference happens locally on your phone.
+A lightweight Android chat app that runs [Tiny Aya Global](https://huggingface.co/CohereLabs/tiny-aya-global) entirely on-device using [llama.cpp](https://github.com/ggml-org/llama.cpp). No internet connection required — all inference happens locally on your phone.
 
-Aya supports 23 languages including English, French, Spanish, Arabic, Hindi, Swahili, Japanese, and more.
+[Tiny Aya](https://cohere.com/blog/cohere-labs-tiny-aya) is a 3.35B parameter multilingual model from Cohere Labs, purpose-built for on-device deployment. It supports **70+ languages** — including many lower-resourced ones — and comes in regional variants (Global, Earth, Fire, Water) tailored for different language ecosystems. We use **Tiny Aya Global** for broad multilingual coverage.
 
 ## Quick Start
 
@@ -44,7 +44,7 @@ Launch the app. It will detect and load the model automatically (takes ~10-15 se
 ## Features
 
 - **Fully offline** — no data leaves your device
-- **Multilingual** — Aya supports 23 languages natively
+- **Multilingual** — Tiny Aya supports 70+ languages natively
 - **Streaming** — tokens appear in real-time as they're generated
 - **Performance metrics** — live tok/s display during generation
 - **Stop generation** — tap Stop to interrupt at any time
@@ -117,7 +117,7 @@ tiny-aya-chat/
 
 The app uses a `:llama` Android library module with JNI bindings adapted from the official [llama.android example](https://github.com/ggml-org/llama.cpp/tree/master/examples/llama.android). Key design decisions:
 
-- **GGUF format** with Q4_K_M quantization for optimal size/quality on mobile
+- **GGUF format** with Q4_K_M quantization (~2.1 GB) of the 3.35B parameter Cohere2 architecture model
 - **Dynamic backend loading** (`GGML_BACKEND_DL=ON`) — CPU variants (armv8.0 through armv9.2) are selected at runtime based on detected CPU features
 - **KleidiAI** acceleration for ARM NEON/dotprod/i8mm operations
 - **Big-core detection** — reads sysfs CPU frequencies to avoid scheduling on efficiency cores
