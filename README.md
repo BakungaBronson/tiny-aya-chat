@@ -57,7 +57,7 @@ On a Galaxy S24 Ultra (Snapdragon 8 Gen 3):
 | Metric | Value |
 |--------|-------|
 | Model load time | ~10s |
-| Generation speed | ~8-12 tok/s |
+| Generation speed | ~0.4 tok/s |
 | RAM usage | ~2.5 GB |
 | APK size | ~46 MB |
 
