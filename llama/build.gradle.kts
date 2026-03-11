@@ -6,6 +6,7 @@ plugins {
 android {
     namespace = "com.craneai.tinyaya.llama"
     compileSdk = 34
+    ndkVersion = "28.0.12916984"
 
     defaultConfig {
         minSdk = 26
@@ -30,7 +31,6 @@ android {
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
-            version = "3.31.4"
         }
     }
 
